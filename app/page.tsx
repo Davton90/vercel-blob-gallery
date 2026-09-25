@@ -21,7 +21,8 @@ export default async function Page() {
     <main className="container">
       <h1>Image Gallery</h1>
       <p className="subtitle">
-        {images.length} image{images.length === 1 ? "" : "s"} stored in Vercel Blob
+        {images.length} image{images.length === 1 ? "" : "s"} stored in Vercel
+        Blob
       </p>
       <UploadClient />
       {error ? (
