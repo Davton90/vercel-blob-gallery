@@ -31,111 +31,166 @@ function fmtSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+interface QueueItem {
+  file: File;
+  status: "pending" | "uploading" | "done" | "error";
+  progress: number;
+  error?: string;
+}
+
 export default function UploadClient() {
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [eta, setEta] = useState<string | null>(null);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!file) return;
-
-    // Validate size before upload
-    const category = categorize(file);
-    if (!category) {
-      setMsg("Unsupported file type. Use image, audio, video, or document.");
-      return;
+  function handleSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files || []);
+    const valid: QueueItem[] = [];
+    for (const file of selected) {
+      const cat = categorize(file);
+      if (!cat) {
+        setQueue((prev) => [
+          ...prev,
+          { file, status: "error", progress: 0, error: "Unsupported type" },
+        ]);
+        continue;
+      }
+      const limit = SIZE_LIMITS[cat];
+      if (file.size > limit) {
+        setQueue((prev) => [
+          ...prev,
+          { file, status: "error", progress: 0, error: `Too large (limit ${fmtSize(limit)})` },
+        ]);
+        continue;
+      }
+      valid.push({ file, status: "pending", progress: 0 });
     }
-    const limit = SIZE_LIMITS[category];
-    if (file.size > limit) {
-      setMsg(`File too large. ${category} limit is ${fmtSize(limit)}.`);
-      return;
-    }
+    if (valid.length) setQueue((prev) => [...prev, ...valid]);
+    // Reset input so the same file can be re-selected
+    e.target.value = "";
+  }
 
-    setLoading(true);
-    setProgress(0);
-    setEta(null);
-    setMsg(null);
-
+  async function uploadOne(item: QueueItem) {
+    setQueue((prev) =>
+      prev.map((q) =>
+        q.file === item.file ? { ...q, status: "uploading", progress: 0 } : q
+      )
+    );
     const started = Date.now();
-
     try {
-      const result = await upload(`uploads/${file.name}`, file, {
+      await upload(`uploads/${item.file.name}`, item.file, {
         access: "public",
         handleUploadUrl: "/api/upload",
         onUploadProgress: (ev) => {
           if (ev.total) {
             const pct = Math.round((ev.loaded / ev.total) * 100);
-            setProgress(pct);
-            const elapsed = (Date.now() - started) / 1000;
-            const speed = ev.loaded / elapsed;
-            const remaining = (ev.total - ev.loaded) / speed;
-            const mins = Math.floor(remaining / 60);
-            const secs = Math.floor(remaining % 60);
-            setEta(
-              pct < 100
-                ? `${mins}m ${secs}s left · ${(speed / 1024 / 1024).toFixed(1)} MB/s`
-                : "Done"
+            setQueue((prev) =>
+              prev.map((q) =>
+                q.file === item.file ? { ...q, progress: pct } : q
+              )
             );
           }
         },
       });
-
-      setMsg("Uploaded. Refreshing...");
-      setFile(null);
-      window.location.reload();
+      setQueue((prev) =>
+        prev.map((q) =>
+          q.file === item.file ? { ...q, status: "done", progress: 100 } : q
+        )
+      );
     } catch (err) {
-      setMsg(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setLoading(false);
-      setProgress(0);
-      setEta(null);
+      setQueue((prev) =>
+        prev.map((q) =>
+          q.file === item.file
+            ? { ...q, status: "error", progress: 0, error: err instanceof Error ? err.message : "Upload failed" }
+            : q
+        )
+      );
     }
   }
 
+  async function handleUploadAll() {
+    const pending = queue.filter((q) => q.status === "pending");
+    for (const item of pending) {
+      await uploadOne(item);
+    }
+    // Refresh the page so newly uploaded files appear in the gallery
+    setTimeout(() => window.location.reload(), 1500);
+  }
+
+  function handleClear() {
+    setQueue((prev) => prev.filter((q) => q.status === "uploading"));
+  }
+
+  const pending = queue.filter((q) => q.status === "pending").length;
+  const uploading = queue.filter((q) => q.status === "uploading").length;
+  const done = queue.filter((q) => q.status === "done").length;
+  const errors = queue.filter((q) => q.status === "error").length;
+  const active = uploading > 0;
+
   return (
-    <form onSubmit={onSubmit} style={{ marginBottom: "1.5rem" }}>
-      <input
-        type="file"
-        accept="image/*,audio/*,video/*,.pdf,.txt,.csv,.json"
-        onChange={(e) => {
-          const f = e.target.files?.[0] ?? null;
-          setFile(f);
-          if (f) {
-            const cat = categorize(f);
-            if (!cat) {
-              setMsg("Unsupported file type.");
-            } else if (f.size > SIZE_LIMITS[cat]) {
-              setMsg(`Too large. ${cat} limit is ${fmtSize(SIZE_LIMITS[cat])}.`);
-            } else {
-              setMsg(null);
-            }
-          } else {
-            setMsg(null);
-          }
+    <div style={{ marginBottom: "1.5rem" }}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (pending > 0) handleUploadAll();
         }}
-        disabled={loading}
-      />
-      <button type="submit" disabled={loading || !file}>
-        {loading ? "Uploading..." : "Upload"}
-      </button>
-      {msg && <span style={{ marginLeft: "0.5rem" }}>{msg}</span>}
-      {loading && (
-        <div style={{ marginTop: "0.75rem", maxWidth: 400 }}>
-          <div className="progress-bar">
-            <div
-              className={`progress-fill${progress === 100 ? " done" : ""}`}
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <div className="progress-meta">
-            <span>{progress}%</span>
-            {eta && <span>{eta}</span>}
-          </div>
+        style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}
+      >
+        <input
+          type="file"
+          accept="image/*,audio/*,video/*,.pdf,.txt,.csv,.json"
+          multiple
+          onChange={handleSelect}
+          disabled={active}
+        />
+        <button type="submit" disabled={active || pending === 0}>
+          {active ? "Uploading..." : `Upload ${pending > 0 ? `${pending} file${pending === 1 ? "" : "s"}` : ""}`}
+        </button>
+        {queue.length > 0 && (
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={active}
+            style={{ background: "#fff", color: "#000", border: "1px solid #ddd" }}
+          >
+            Clear
+          </button>
+        )}
+      </form>
+
+      {queue.length > 0 && (
+        <div className="upload-queue" style={{ marginTop: "1rem" }}>
+          {queue.map((item, i) => (
+            <div key={i} className="queue-item">
+              <div className="queue-info">
+                <span className="queue-name" title={item.file.name}>
+                  {item.file.name.length > 40
+                    ? item.file.name.slice(0, 38) + "…"
+                    : item.file.name}
+                </span>
+                <span className="queue-meta">
+                  {fmtSize(item.file.size)}
+                  {item.error && <span className="queue-error"> · {item.error}</span>}
+                </span>
+              </div>
+              {item.status === "uploading" && (
+                <div className="progress-bar" style={{ flex: 1, margin: "0 0.5rem" }}>
+                  <div
+                    className="progress-fill"
+                    style={{ width: `${item.progress}%` }}
+                  />
+                </div>
+              )}
+              {item.status === "done" && <span className="queue-status done">✓</span>}
+              {item.status === "error" && <span className="queue-status err">✕</span>}
+              {item.status === "pending" && <span className="queue-status">○</span>}
+            </div>
+          ))}
+          {done > 0 && (
+            <p className="queue-summary">
+              {done} upload{done === 1 ? "" : "s"} complete · Refreshing page...
+            </p>
+          )}
         </div>
       )}
-    </form>
+    </div>
   );
 }
