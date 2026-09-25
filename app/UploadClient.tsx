@@ -3,6 +3,34 @@
 import { useState } from "react";
 import { upload } from "@vercel/blob/client";
 
+// Size limits per category (bytes)
+const SIZE_LIMITS = {
+  image: 10 * 1024 * 1024,      // 10 MB
+  audio: 50 * 1024 * 1024,     // 50 MB
+  video: 100 * 1024 * 1024,    // 100 MB
+  document: 25 * 1024 * 1024,  // 25 MB
+};
+
+function categorize(file: File): "image" | "audio" | "video" | "document" | null {
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type.startsWith("audio/")) return "audio";
+  if (file.type.startsWith("video/")) return "video";
+  if (
+    file.type === "application/pdf" ||
+    file.type === "text/plain" ||
+    file.type === "text/csv" ||
+    file.type === "application/json"
+  )
+    return "document";
+  return null;
+}
+
+function fmtSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export default function UploadClient() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
@@ -13,6 +41,19 @@ export default function UploadClient() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) return;
+
+    // Validate size before upload
+    const category = categorize(file);
+    if (!category) {
+      setMsg("Unsupported file type. Use image, audio, video, or document.");
+      return;
+    }
+    const limit = SIZE_LIMITS[category];
+    if (file.size > limit) {
+      setMsg(`File too large. ${category} limit is ${fmtSize(limit)}.`);
+      return;
+    }
+
     setLoading(true);
     setProgress(0);
     setEta(null);
@@ -21,8 +62,6 @@ export default function UploadClient() {
     const started = Date.now();
 
     try {
-      // Client-side upload: file goes directly from browser to Vercel Blob,
-      // bypassing the function body size limit (4.5MB).
       const result = await upload(`uploads/${file.name}`, file, {
         access: "public",
         handleUploadUrl: "/api/upload",
@@ -60,8 +99,23 @@ export default function UploadClient() {
     <form onSubmit={onSubmit} style={{ marginBottom: "1.5rem" }}>
       <input
         type="file"
-        accept="image/*"
-        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        accept="image/*,audio/*,video/*,.pdf,.txt,.csv,.json"
+        onChange={(e) => {
+          const f = e.target.files?.[0] ?? null;
+          setFile(f);
+          if (f) {
+            const cat = categorize(f);
+            if (!cat) {
+              setMsg("Unsupported file type.");
+            } else if (f.size > SIZE_LIMITS[cat]) {
+              setMsg(`Too large. ${cat} limit is ${fmtSize(SIZE_LIMITS[cat])}.`);
+            } else {
+              setMsg(null);
+            }
+          } else {
+            setMsg(null);
+          }
+        }}
         disabled={loading}
       />
       <button type="submit" disabled={loading || !file}>

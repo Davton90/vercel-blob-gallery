@@ -3,34 +3,74 @@
 import DeleteButton from "./DeleteButton";
 import { useState } from "react";
 
-type ViewMode = "grid" | "list";
+type FileCategory = "image" | "audio" | "video" | "document";
 
-export default function GalleryView({
-  images,
-}: {
-  images: { url: string; pathname: string; size?: number }[];
-}) {
-  const [view, setView] = useState<ViewMode>("grid");
+interface FileItem {
+  url: string;
+  pathname: string;
+  size?: number;
+  category: FileCategory;
+}
+
+function fmtSize(bytes?: number) {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function fmtDate(pathname: string) {
+  const ts = pathname.match(/^uploads\/(\d+)/)?.[1];
+  if (!ts) return "";
+  return new Date(Number(ts)).toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function Preview({ item }: { item: FileItem }) {
+  switch (item.category) {
+    case "image":
+      return (
+        <img
+          src={item.url}
+          alt={item.pathname}
+          loading="lazy"
+          style={{ width: "100%", height: "auto", display: "block" }}
+        />
+      );
+    case "video":
+      return (
+        <video
+          src={item.url}
+          controls
+          preload="metadata"
+          style={{ width: "100%", height: "auto", display: "block", borderRadius: 6 }}
+        />
+      );
+    case "audio":
+      return (
+        <div className="media-placeholder audio">
+          <span className="media-icon">🎵</span>
+          <audio src={item.url} controls preload="none" style={{ width: "100%", marginTop: 8 }} />
+        </div>
+      );
+    case "document":
+      return (
+        <div className="media-placeholder doc">
+          <span className="media-icon">📄</span>
+          <span className="media-name">{item.pathname.split("/").pop()}</span>
+        </div>
+      );
+  }
+}
+
+export default function GalleryView({ images }: { images: FileItem[] }) {
+  const [view, setView] = useState<"grid" | "list">("grid");
 
   if (images.length === 0) {
-    return <p className="empty">No images yet. Upload one above.</p>;
-  }
-
-  function fmtSize(bytes?: number) {
-    if (!bytes) return "";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  }
-
-  function fmtDate(pathname: string) {
-    const ts = pathname.match(/^uploads\/(\d+)/)?.[1];
-    if (!ts) return "";
-    return new Date(Number(ts)).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+    return <p className="empty">No files yet. Upload one above.</p>;
   }
 
   return (
@@ -56,45 +96,29 @@ export default function GalleryView({
         </button>
       </div>
 
-      <div
-        className={view === "list" ? "list-view" : "grid-view grid"}
-        style={{ marginTop: "1rem" }}
-      >
-        {images.map((blob) => (
+      <div className={view === "list" ? "list-view" : "grid-view grid"} style={{ marginTop: "1rem" }}>
+        {images.map((item) => (
           <div
-            key={blob.url}
+            key={item.url}
             className={view === "list" ? "list-item" : "card"}
             style={{ position: "relative" }}
           >
-            <DeleteButton url={blob.url} pathname={blob.pathname} />
+            <DeleteButton url={item.url} pathname={item.pathname} />
 
             {view === "grid" ? (
-              <img
-                src={blob.url}
-                alt={blob.pathname}
-                loading="lazy"
-                style={{ width: "100%", height: "auto", display: "block" }}
-              />
+              <Preview item={item} />
             ) : (
               <div className="list-thumb">
-                <img
-                  src={blob.url}
-                  alt={blob.pathname}
-                  loading="lazy"
-                />
+                <Preview item={item} />
               </div>
             )}
 
-            <div
-              className={view === "list" ? "list-info" : "meta"}
-              style={{ flex: 1 }}
-            >
-              <div className="list-title">
-                {blob.pathname.replace("uploads/", "")}
-              </div>
+            <div className={view === "list" ? "list-info" : "meta"} style={{ flex: 1 }}>
+              <div className="list-title">{item.pathname.replace("uploads/", "")}</div>
               <div className="list-detail">
-                <span>📅 {fmtDate(blob.pathname)}</span>
-                <span>💾 {fmtSize(blob.size)}</span>
+                <span>📅 {fmtDate(item.pathname)}</span>
+                <span>💾 {fmtSize(item.size)}</span>
+                <span>📁 {item.category}</span>
               </div>
             </div>
           </div>
