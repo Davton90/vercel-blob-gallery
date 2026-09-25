@@ -8,8 +8,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async (pathname) => {
-        // Validate the file type before allowing the upload
+      onBeforeGenerateToken: async () => {
         return {
           allowedContentTypes: [
             "image/jpeg",
@@ -20,7 +19,6 @@ export async function POST(request: Request): Promise<NextResponse> {
             "image/svg+xml",
           ],
           addRandomSuffix: true,
-          tokenPayload: JSON.stringify({ source: "gallery" }),
         };
       },
       onUploadCompleted: async ({ blob }) => {

@@ -23,7 +23,7 @@ export default function UploadClient() {
     try {
       // Client-side upload: file goes directly from browser to Vercel Blob,
       // bypassing the function body size limit (4.5MB).
-      const result = await upload(file.name, file, {
+      const result = await upload(`uploads/${file.name}`, file, {
         access: "public",
         handleUploadUrl: "/api/upload",
         onUploadProgress: (ev) => {
