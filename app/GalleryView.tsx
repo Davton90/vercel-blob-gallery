@@ -3,10 +3,21 @@
 import DeleteButton from "./DeleteButton";
 import { useState } from "react";
 
+const STORAGE_KEY = "gallery_pw";
+
+function withPassword(url: string): string {
+  if (typeof window === "undefined") return url;
+  const pw = sessionStorage.getItem(STORAGE_KEY);
+  if (!pw) return url;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}pw=${encodeURIComponent(pw)}`;
+}
+
 type FileCategory = "image" | "audio" | "video" | "document";
 
 interface FileItem {
   url: string;
+  deleteUrl: string;
   pathname: string;
   size?: number;
   category: FileCategory;
@@ -30,11 +41,12 @@ function fmtDate(pathname: string) {
 }
 
 function Preview({ item }: { item: FileItem }) {
+  const src = withPassword(item.url);
   switch (item.category) {
     case "image":
       return (
         <img
-          src={item.url}
+          src={src}
           alt={item.pathname}
           loading="lazy"
           style={{ width: "100%", height: "auto", display: "block" }}
@@ -43,7 +55,7 @@ function Preview({ item }: { item: FileItem }) {
     case "video":
       return (
         <video
-          src={item.url}
+          src={src}
           controls
           preload="metadata"
           style={{ width: "100%", height: "auto", display: "block", borderRadius: 6 }}
@@ -53,7 +65,7 @@ function Preview({ item }: { item: FileItem }) {
       return (
         <div className="media-placeholder audio">
           <span className="media-icon">🎵</span>
-          <audio src={item.url} controls preload="none" style={{ width: "100%", marginTop: 8 }} />
+          <audio src={src} controls preload="none" style={{ width: "100%", marginTop: 8 }} />
         </div>
       );
     case "document":
@@ -103,7 +115,7 @@ export default function GalleryView({ images }: { images: FileItem[] }) {
             className={view === "list" ? "list-item" : "card"}
             style={{ position: "relative" }}
           >
-            <DeleteButton url={item.url} pathname={item.pathname} />
+            <DeleteButton deleteUrl={item.deleteUrl} pathname={item.pathname} />
 
             {view === "grid" ? (
               <Preview item={item} />

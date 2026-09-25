@@ -99,3 +99,52 @@ button:disabled { opacity: 0.5; cursor: default; }
 .progress-fill { height: 100%; background: #0070f3; transition: width 0.2s ease; }
 .progress-fill.done { background: #16a34a; }
 .progress-meta { margin-top: 0.35rem; font-size: 0.8rem; color: #666; display: flex; justify-content: space-between; }
+
+/* Password gate */
+.pw-gate {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.pw-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.pw-card h2 { margin-top: 0; }
+.pw-card p { color: #666; font-size: 0.9rem; }
+.pw-form { display: flex; gap: 0.5rem; margin-top: 1rem; }
+.pw-form input { flex: 1; padding: 0.6rem; font-size: 1rem; border: 1px solid #ddd; border-radius: 6px; }
+.pw-form button { padding: 0.6rem 1.2rem; font-size: 1rem; }
+.pw-error { color: #d32f2f; font-size: 0.85rem; margin-top: 0.5rem; }
+
+/* Password bar */
+.pw-bar {
+  background: #e8f5e9;
+  border: 1px solid #c8e6c9;
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+.pw-logout {
+  background: none;
+  border: 1px solid #c8e6c9;
+  color: #2e7d32;
+  border-radius: 4px;
+  padding: 0.2rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+.pw-logout:hover { background: #c8e6c9; }

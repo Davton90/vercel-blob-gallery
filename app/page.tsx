@@ -1,6 +1,7 @@
 import { list } from "@vercel/blob";
 import GalleryView from "./GalleryView";
 import UploadClient from "./UploadClient";
+import PasswordGate from "./PasswordGate";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,12 +17,13 @@ function categorize(pathname: string): FileCategory {
 }
 
 export default async function Page() {
-  let images: { url: string; pathname: string; size?: number; category: FileCategory }[] = [];
+  let files: { url: string; deleteUrl: string; pathname: string; size?: number; category: FileCategory }[] = [];
   let error: string | null = null;
   try {
     const { blobs } = await list({ prefix: "uploads/" });
-    images = blobs.map((b) => ({
-      url: b.url,
+    files = blobs.map((b) => ({
+      url: `/api/file/${b.pathname.replace("uploads/", "")}`,
+      deleteUrl: b.url,
       pathname: b.pathname,
       size: b.size,
       category: categorize(b.pathname),
@@ -30,29 +32,22 @@ export default async function Page() {
     error = e instanceof Error ? e.message : "Failed to load files";
   }
 
-  const counts = {
-    image: images.filter((i) => i.category === "image").length,
-    audio: images.filter((i) => i.category === "audio").length,
-    video: images.filter((i) => i.category === "video").length,
-    document: images.filter((i) => i.category === "document").length,
-  };
-
   return (
     <main className="container">
       <h1>Media Gallery</h1>
-      <p className="subtitle">
-        {images.length} file{images.length === 1 ? "" : "s"} ·{" "}
-        {counts.image} image{counts.image === 1 ? "" : "s"} ·{" "}
-        {counts.video} video{counts.video === 1 ? "" : "s"} ·{" "}
-        {counts.audio} audio{counts.audio === 1 ? "" : "s"} ·{" "}
-        {counts.document} doc{counts.document === 1 ? "" : "s"}
-      </p>
-      <UploadClient />
-      {error ? (
-        <p className="empty">⚠ {error}</p>
-      ) : (
-        <GalleryView images={images} />
-      )}
+      <PasswordGate>
+        {error ? (
+          <p className="empty">⚠ {error}</p>
+        ) : (
+          <>
+            <p className="subtitle">
+              {files.length} file{files.length === 1 ? "" : "s"} stored in Vercel Blob
+            </p>
+            <UploadClient />
+            <GalleryView images={files} />
+          </>
+        )}
+      </PasswordGate>
     </main>
   );
 }

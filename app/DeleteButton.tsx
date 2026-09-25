@@ -3,10 +3,10 @@
 import { useState } from "react";
 
 export default function DeleteButton({
-  url,
+  deleteUrl,
   pathname,
 }: {
-  url: string;
+  deleteUrl: string;
   pathname: string;
 }) {
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,7 @@ export default function DeleteButton({
       const res = await fetch("/api/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ urls: [url] }),
+        body: JSON.stringify({ urls: [deleteUrl] }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
